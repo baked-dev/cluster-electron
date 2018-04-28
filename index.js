@@ -33,7 +33,7 @@ class CustomInterface extends Emitter {
             //find out which worker handles the task
             const workerID = find_task(data.id);
             if (workerID !== false) {
-                worker_message(workerID, {action:'update_task', payload: data});
+                worker_message(workerID, {action:'edit_task', payload: data});
                 edit_task(workerID, data);
             }
         }
@@ -112,9 +112,48 @@ let workersmap = {},
 if (cluster.isMaster) {
     logger.log('Master running', 'MASTER');
     //start workers
+    const { BrowserWindow, app } = require('electron');
     for (let core = 0; core < numCPUs; core++) {
         new_worker();
     }
+    let tasksid = 0;
+    app.on('ready', () => {
+        const Window = new BrowserWindow();
+        Interface
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .new_worker()
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+            .edit_task({id:9, pid: "AC7033", size: 9, region: 'US'})
+            .on('update_task', console.log)
+    })
 } else {
     logger.log('Worker running and waiting for tasks');
     const ExampleTask = require('./ExampleTask');
@@ -131,6 +170,8 @@ if (cluster.isMaster) {
             new_task(data);
         } else if (data.action === 'start_task') {
             taskmap[data.payload].start();
+        } else if (data.action === 'edit_task') {
+            logger.log('edit task: ' + JSON.stringify(data.payload));
         }
     })
 }
