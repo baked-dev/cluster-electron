@@ -22,8 +22,19 @@ class CustomInterface extends Emitter {
             //send task start message to worker
             worker_message(lowest_key, {action:'new_task', payload: data});
             workersmap[lowest_key].tasks_amount++;
+            workersmap[lowest_key].tasks.push(data);
         }
         //return this easy method chaning
+        return this;
+    }
+    edit_task (data) {
+        if (cluster.isMaster) {
+            //find out which worker handles the task
+            const workerID = find_task(data.id);
+            if (workerID !== false) {
+                worker_message(workerID, {action:'update_task', payload: data});
+            }
+        }
         return this;
     }
     new_worker () {
@@ -89,6 +100,17 @@ if (cluster.isMaster) {
         logger.log(`received message from master: ${JSON.stringify(data)}`);
         process.send({action:'started_task'});
     })
+    /* 
+    const AdidasTask = require('./adidas-task');
+    let taskmap = {},
+        tasksID = 0;
+    process.on('message', (data) => {
+        if (data.type === 'new_task') {
+            taskmap[tasksID++] = new AdidasTask(data)
+                .on('update', process.send)
+        }
+    })
+    */
 }
 module.exports = Interface;
 
