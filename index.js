@@ -3,8 +3,8 @@ const numCPUs = require('os').cpus().length;
 const Emitter = require('events');
 
 class Logger {
-    log (string, process) {
-        console.log(`${new Date().toISOString()} | ${process} | ${string}`)
+    log (string, processID = process.pid) {
+        console.log(`${new Date().toISOString()} | ${processID} | ${string}`)
     }
 }
 const logger = new Logger;
@@ -45,9 +45,9 @@ let workersmap = {},
     Interface = new CustomInterface();  
 
 if (cluster.isMaster) {
-    logger.log('Master running', process.pid);
+    logger.log('Master running', 'MASTER');
     //start workers
-    for (let core = 0; core<numCPUs; core++) {
+    for (let core = 0; core < numCPUs; core++) {
         const id = workersID++;
         workersmap[id] = {
             worker: cluster.fork(),
@@ -56,14 +56,14 @@ if (cluster.isMaster) {
         };
         workersmap[id].worker.on('message', (message) => {
             if (message.action === 'started_task') {
-                logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e =>  workersmap[e].tasks_amount).join()}`, process.pid)
+                logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
             }
         });
     }
 } else {
-    logger.log('Worker running and waiting for tasks', process.pid);
+    logger.log('Worker running and waiting for tasks');
     process.on('message', (data) => {
-        logger.log(`received message from master: ${JSON.stringify(data)}`, process.pid);
+        logger.log(`received message from master: ${JSON.stringify(data)}`);
         process.send({action:'started_task'});
     })
 }
