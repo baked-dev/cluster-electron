@@ -34,6 +34,7 @@ class CustomInterface extends Emitter {
             const workerID = find_task(data.id);
             if (workerID !== false) {
                 worker_message(workerID, {action:'update_task', payload: data});
+                edit_task(workerID, data);
             }
         }
         return this;
@@ -93,6 +94,16 @@ const new_worker = register_new_worker_and_event_listeners = () => {
         }
     });
 }
+
+const edit_task = edit_task_in_workersmap = (workerID, data) => {
+    //find task index in array
+    for (let i in workersmap[workerID].tasks) {
+        if (workersmap[workerID].tasks[i].id === data.id) {
+            workersmap[workerID].tasks[i] = data;
+        }
+    }
+}
+
 //global reference to the Interface that will be exported
 let workersmap = {},
     workersID = 0,
@@ -123,5 +134,6 @@ if (cluster.isMaster) {
         }
     })
 }
+
 module.exports = Interface;
 
