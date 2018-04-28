@@ -18,19 +18,18 @@ class CustomInterface extends Emitter {
         //cluster management only happens in the master process
         if (cluster.isMaster) {
             //find worker that has the least amout of tasks
-            let lowest_val = false;
-            let lowest_key = false;
-            for (let key of Object.keys(workersmap)) {
-                if (lowest_val === false || workersmap[key].tasks_amount < lowest_val) {
-                    lowest_val = workersmap[key].tasks_amount;
-                    lowest_key = key;
-                }
-            }
+            let lowest_key = get_best_worker();
             //send task start message to worker
             worker_message(lowest_key, {action:'new_task', payload: data});
             workersmap[lowest_key].tasks_amount++;
         }
         //return this easy method chaning
+        return this;
+    }
+    new_worker () {
+        if (cluster.isMaster) {
+            new_worker();
+        }
         return this;
     }
 }
@@ -39,6 +38,40 @@ const worker_message = send_message_to_worker = (worker, message) => {
     workersmap[worker].worker.send(message);
 }
 
+const get_best_worker = find_worker_with_lowest_tasks_amount = () => {
+    let lowest_val = false;
+    let lowest_key = false;
+    for (let key of Object.keys(workersmap)) {
+        if (lowest_val === false || workersmap[key].tasks_amount < lowest_val) {
+            lowest_val = workersmap[key].tasks_amount;
+            lowest_key = key;
+        }
+    }
+    return lowest_key;
+}
+
+const find_task = get_worker_id_that_handles_task = (taskID) => {
+    for (let key of Object.keys(workersmap)) {
+        if (workersmap[key].tasks.map(e => e.id).includes(taskID)) return key;
+    }
+    return null;
+}
+
+const new_worker = register_new_worker_and_event_listeners = () => {
+    const id = workersID++;
+    workersmap[id] = {
+        worker: cluster.fork(),
+        tasks_amount: 0,
+        tasks: [],
+    };
+    workersmap[id].worker.on('message', (message) => {
+        if (message.action === 'started_task') {
+            logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
+        } else if (message.action === 'update_task') {
+            Interface.emit('update_task', {worker:id, data: message.data});
+        }
+    });
+}
 //global reference to the Interface that will be exported
 let workersmap = {},
     workersID = 0,
@@ -48,17 +81,7 @@ if (cluster.isMaster) {
     logger.log('Master running', 'MASTER');
     //start workers
     for (let core = 0; core < numCPUs; core++) {
-        const id = workersID++;
-        workersmap[id] = {
-            worker: cluster.fork(),
-            tasks_amount: 0,
-            tasks: [],
-        };
-        workersmap[id].worker.on('message', (message) => {
-            if (message.action === 'started_task') {
-                logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
-            }
-        });
+        new_worker();
     }
 } else {
     logger.log('Worker running and waiting for tasks');
