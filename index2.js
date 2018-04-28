@@ -1,6 +1,16 @@
 const cluster = require('./index');
-cluster.start_task({pid:'AC0223'}).start_task({pid:'AC0223'}).start_task({pid:'AC0223'}).start_task({pid:'AC0223'}).start_task({pid:'AC0223'}).start_task({pid:'AC0223'})
-cluster.start_task({pid:'AC0223'}).new_worker()
-cluster.start_task({pid:'AC0223'})
-cluster.start_task({pid:'AC0223'})
-cluster.start_task({pid:'AC0223'})
+let tasksid = 0
+cluster
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
+    .on('update_task', console.log)
+const start_all = () => {
+    for (let i = 0; i < tasksid; i++) {
+        cluster.start_task(i);
+    }
+}
+setTimeout(start_all, 1000);

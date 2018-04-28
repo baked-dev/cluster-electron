@@ -14,9 +14,10 @@ class CustomInterface extends Emitter {
     constructor () {
         super();
     }
-    start_task (data) {
+    add_task (data) {
         //cluster management only happens in the master process
         if (cluster.isMaster) {
+            logger.log('adding task', 'MASTER')
             //find worker that has the least amout of tasks
             let lowest_key = get_best_worker();
             //send task start message to worker
@@ -33,6 +34,15 @@ class CustomInterface extends Emitter {
             const workerID = find_task(data.id);
             if (workerID !== false) {
                 worker_message(workerID, {action:'update_task', payload: data});
+            }
+        }
+        return this;
+    }
+    start_task (taskID) {
+        if (cluster.isMaster) {
+            const workerID = find_task(taskID);
+            if (workerID !== false) {
+                worker_message(workerID, {action:'start_task', payload: taskID});
             }
         }
         return this;
@@ -79,7 +89,7 @@ const new_worker = register_new_worker_and_event_listeners = () => {
         if (message.action === 'started_task') {
             logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
         } else if (message.action === 'update_task') {
-            Interface.emit('update_task', {worker:id, data: message.data});
+            Interface.emit('update_task', {worker:id, data: message.payload});
         }
     });
 }
@@ -96,21 +106,22 @@ if (cluster.isMaster) {
     }
 } else {
     logger.log('Worker running and waiting for tasks');
+    const ExampleTask = require('./ExampleTask');
+
+    const new_task = register_new_task = (data) => {
+        taskmap[data.payload.id] = new ExampleTask(data.payload);
+    }
+
+    let taskmap = {};
+    process.send({type:'ready'});
     process.on('message', (data) => {
-        logger.log(`received message from master: ${JSON.stringify(data)}`);
-        process.send({action:'started_task'});
-    })
-    /* 
-    const AdidasTask = require('./adidas-task');
-    let taskmap = {},
-        tasksID = 0;
-    process.on('message', (data) => {
-        if (data.type === 'new_task') {
-            taskmap[tasksID++] = new AdidasTask(data)
-                .on('update', process.send)
+        if (data.action === 'new_task') {
+            logger.log('new task: ' + JSON.stringify(data.payload));
+            new_task(data);
+        } else if (data.action === 'start_task') {
+            taskmap[data.payload].start();
         }
     })
-    */
 }
 module.exports = Interface;
 
