@@ -54,6 +54,12 @@ class CustomInterface extends Emitter {
         }
         return this;
     }
+    init_workers () {
+        if (cluster.isMaster) {
+            init_workers()
+        }
+        return this;
+    }
 }
 
 const worker_message = send_message_to_worker = (worker, message) => {
@@ -80,19 +86,45 @@ const find_task = get_worker_id_that_handles_task = (taskID) => {
 }
 
 const new_worker = register_new_worker_and_event_listeners = () => {
-    const id = workersID++;
+    const id = workersID++; 
     workersmap[id] = {
         worker: cluster.fork(),
         tasks_amount: 0,
         tasks: [],
+        pid: null,
     };
     workersmap[id].worker.on('message', (message) => {
         if (message.action === 'started_task') {
             logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
         } else if (message.action === 'update_task') {
             Interface.emit('update_task', {worker:id, data: message.payload});
+        } else if (message.action === 'ready') {
+            workersmap[id].pid = message.payload;
         }
     });
+    return id;
+}
+
+const init_workers = initialise_one_worker_per_cpu_code = () => {
+    for (let core = 0; core < numCPUs; core++) {
+        new_worker();
+    }
+}
+
+const restart_worker = restart_worker_after_death_by_pid = (worker) => {
+    //find workersID
+    for (const key of Object.keys(workersmap)) {
+        if (workersmap[key].pid === worker.pid) {
+            const { tasks } = workersmap[key];
+            //start new worker
+            new_worker();
+            //re-distribute dead tasks
+            for (const task of tasks) {
+                Interface.add_task(task);
+            }
+            break;
+        }
+    }
 }
 
 const edit_task = edit_task_in_workersmap = (workerID, data) => {
@@ -111,49 +143,7 @@ let workersmap = {},
 
 if (cluster.isMaster) {
     logger.log('Master running', 'MASTER');
-    //start workers
-    const { BrowserWindow, app } = require('electron');
-    for (let core = 0; core < numCPUs; core++) {
-        new_worker();
-    }
-    let tasksid = 0;
-    app.on('ready', () => {
-        const Window = new BrowserWindow();
-        Interface
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .new_worker()
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .add_task({id:tasksid++, pid: "AC7033", size: 10, region: 'US'})
-            .edit_task({id:9, pid: "AC7033", size: 9, region: 'US'})
-            .on('update_task', console.log)
-    })
+    cluster.on('death', restart_worker);
 } else {
     logger.log('Worker running and waiting for tasks');
     const ExampleTask = require('./ExampleTask');
@@ -163,7 +153,7 @@ if (cluster.isMaster) {
     }
 
     let taskmap = {};
-    process.send({type:'ready'});
+    process.send({action:'ready', payload: process.pid});
     process.on('message', (data) => {
         if (data.action === 'new_task') {
             logger.log('new task: ' + JSON.stringify(data.payload));
@@ -176,5 +166,8 @@ if (cluster.isMaster) {
     })
 }
 
-module.exports = Interface;
+module.exports = {
+    Interface,
+    isMaster: cluster.isMaster
+};
 
