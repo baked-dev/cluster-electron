@@ -48,6 +48,13 @@ class CustomInterface extends Emitter {
         }
         return this;
     }
+    start_all () {
+        if (cluster.isMaster) {
+            //holy shit i made this and it worked first try
+            Object.keys(workersmap).map(e => workersmap[e].tasks.map(f => (!f.running?f.id:false))).map(e => e.map(f => f!==false?this.start_task(f):false));
+        }
+        return this;
+    }
     new_worker () {
         if (cluster.isMaster) {
             new_worker();
@@ -165,6 +172,7 @@ if (cluster.isMaster) {
         }
     })
 }
+//made this for jm yesterday
 
 module.exports = {
     Interface,
