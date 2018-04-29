@@ -13,6 +13,7 @@ const logger = new Logger;
 class CustomInterface extends Emitter {
     constructor () {
         super();
+        this.last_start_all = 0;
     }
     add_task (data) {
         //cluster management only happens in the master process
@@ -48,10 +49,15 @@ class CustomInterface extends Emitter {
         }
         return this;
     }
-    start_all () {
+    start_all (force = false) {
         if (cluster.isMaster) {
-            //holy shit i made this and it worked first try
-            Object.keys(workersmap).map(e => workersmap[e].tasks.map(f => (!f.running?f.id:false))).map(e => e.map(f => f!==false?this.start_task(f):false));
+            if (new Date().getTime() - this.last_start_all < 2000 || force) {
+                logger.log('cooldown on start all', 'MASTER');
+            } else {
+                //holy shit i made this and it worked first try
+                Object.keys(workersmap).map(e => workersmap[e].tasks.map(f => (!f.running?f.id:false))).map(e => e.map(f => f!==false?this.start_task(f):false));
+                this.start_all = new Date().getTime();
+            }
         }
         return this;
     }
@@ -100,13 +106,16 @@ const new_worker = register_new_worker_and_event_listeners = () => {
         tasks: [],
         pid: null,
     };
-    workersmap[id].worker.on('message', (message) => {
-        if (message.action === 'started_task') {
-            logger.log(`worker ${id} started task, ${Object.keys(workersmap).map(e => workersmap[e].tasks_amount).join()}`, 'MASTER')
-        } else if (message.action === 'update_task') {
-            Interface.emit('update_task', {worker:id, data: message.payload});
-        } else if (message.action === 'ready') {
-            workersmap[id].pid = message.payload;
+    workersmap[id].worker.on('message', ({ action, payload }) => {
+        if (action === 'update_task') {
+            Interface.emit('update_task', {worker:id, data: payload});
+            //imtercept message to set that task to running
+            const { status } = payload;                                         //cant destructure id because that would interfere with the workersID in this context
+            if (status === 'started' || status === 'stopped') {
+                edit_task(id, {id:payload.id, running: (status === 'started'?true:false)});
+            }
+        } else if (action === 'ready') {
+            workersmap[id].pid = payload;
         }
     });
     return id;
@@ -138,9 +147,14 @@ const edit_task = edit_task_in_workersmap = (workerID, data) => {
     //find task index in array
     for (let i in workersmap[workerID].tasks) {
         if (workersmap[workerID].tasks[i].id === data.id) {
-            workersmap[workerID].tasks[i] = data;
+            //merge objects instead of completely overwriting, allows editing by just sending {id:taskID, running:true} for example
+            workersmap[workerID].tasks[i] = Object.assign(workersmap[workerID].tasks[i], data);
         }
     }
+}
+
+const randInt = random_integer = (min, max) => {
+    return Math.floor(Math.random()*(max - min)) + min;
 }
 
 //global reference to the Interface that will be exported
@@ -176,6 +190,7 @@ if (cluster.isMaster) {
 
 module.exports = {
     Interface,
+    randInt,
     isMaster: cluster.isMaster
 };
 
