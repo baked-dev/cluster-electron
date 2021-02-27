@@ -23,6 +23,7 @@ if (cluster.isMaster) {
             //find worker that has the least amout of tasks
             let lowest_key = get_best_worker();
             //send task start message to worker
+            console.log(data);
             worker_message(lowest_key, {action:'new_task', payload: data});
             workersmap[lowest_key].tasks_amount++;
             workersmap[lowest_key].tasks.push(data);
@@ -48,9 +49,9 @@ if (cluster.isMaster) {
             if (new Date().getTime() - this.last_start_all < 2000 || force) {
                 logger.log('cooldown on start all', 'MASTER');
             } else {
-                //holy shit i made this and it worked first try
+                //holy shit i made this and it worked first try // note to my past self: this is ugly 
                 Object.keys(workersmap).map(e => workersmap[e].tasks.map(f => (!f.running?f.id:false))).map(e => e.map(f => f!==false?this.start_task(f):false));
-                this.start_all = new Date().getTime();
+                this.last_start_all = new Date().getTime();
             }
             return this;
         }
@@ -158,11 +159,15 @@ if (cluster.isMaster) {
         isMaster: cluster.isMaster
     };
 } else {
+    // trying to make the task to run dynamic.
+    const TaskTypes = {};
     logger.log('Worker running and waiting for tasks');
-    const ExampleTask = require('./ExampleTask');
 
     const new_task = register_new_task = (data) => {
-        taskmap[data.payload.id] = new ExampleTask(data.payload);
+        // dont want to pass the entire task class down to itself
+        console.log(data.payload)
+        const task = TaskTypes[data.payload.type];
+        taskmap[data.payload.id] = new task(data.payload);
     }
     let taskmap = {};
     process.send({action:'ready', payload: process.pid});
@@ -178,7 +183,8 @@ if (cluster.isMaster) {
     })
     module.exports = {
         Interface: false,
-        isMaster: cluster.isMaster
+        isMaster: cluster.isMaster,
+        TaskTypes
     };
 }
 //lmao

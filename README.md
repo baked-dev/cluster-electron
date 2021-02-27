@@ -1,6 +1,7 @@
 # cluster-electron
 
-alright quick readme since ive added a lot of stuff
+this project was made since i wanted to use multiple cpu cores to do work from an electron app.
+I have since adopted TypeScript and this that the language would add a lot of value to this.
 
 ## main file and electron process
 the main file should look something like this:
